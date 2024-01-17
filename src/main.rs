@@ -21,7 +21,7 @@ fn get_window_title(window: HWND) -> String {
     }
 }
 
-fn center_window(window_title: &str, already_did: &Arc<RwLock<i8>>) {
+fn center_window(window_title: &str, already_did: &Arc<RwLock<i8>>, delay: u64) {
     let vs = VirtualScreen::new();
     let primary_monitor = vs.monitor_bounds(0);
     let w = primary_monitor.width();
@@ -38,6 +38,11 @@ fn center_window(window_title: &str, already_did: &Arc<RwLock<i8>>) {
     if (window_title.is_empty() || found_title.as_str() == window_title)
         && *already_did.read().unwrap() == 0
     {
+        // Wait x milliseconds before getting the target window size and centering it.
+        if delay > 0 {
+            thread::sleep(time::Duration::from_millis(delay));
+        }
+
         let mut rect = RECT {
             left: 0,
             top: 0,
@@ -70,6 +75,12 @@ struct Args {
     #[arg(short, long)]
     title: Option<String>,
 
+    /// How long to wait in milliseconds before centering the window.
+    /// Some windows may change in size shortly after appearing so
+    /// this delay will allow more flexibility.
+    #[arg(short, long)]
+    delay: Option<u64>,
+
     /// Print the title of the currently active (foreground) window after 1 second.
     #[arg(short, long)]
     print: bool,
@@ -91,13 +102,15 @@ fn main() {
     }
 
     if let Some(title_to_center) = args.title {
+        // Delay in milliseconds before centering.
+        let delay = if let Some(d) = args.delay { d } else { 0 };
         // Use this crazy thing to center the correct window only once as long
         // as it is on the foreground.
         let already_did = Arc::new(RwLock::new(0));
 
         // Loop till manually killed!
         loop {
-            center_window(&title_to_center, &already_did);
+            center_window(&title_to_center, &already_did, delay);
 
             thread::sleep(time::Duration::from_millis(200));
         }
